@@ -6,10 +6,10 @@
  * ota_request_update(): signal the bootloader (watchdog scratch) and reboot into
  *   network recovery to receive a new image.
  */
-#ifndef KEYPAD_OTA_APP_H
-#define KEYPAD_OTA_APP_H
+#ifndef PANEL_OTA_APP_H
+#define PANEL_OTA_APP_H
 
 void ota_confirm(void);
 void ota_request_update(void) __attribute__((noreturn));
 
-#endif /* KEYPAD_OTA_APP_H */
+#endif /* PANEL_OTA_APP_H */

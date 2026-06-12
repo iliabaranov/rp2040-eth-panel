@@ -1,153 +1,163 @@
-"""ctypes bindings for the pure firmware modules (built into libkeypadcore.so).
+"""ctypes bindings for the pure firmware modules (built into libpanelcore.so).
 
-These are the SAME C sources compiled into the firmware (keypad, lighting,
+These are the SAME C sources compiled into the firmware (buttons, rings,
 protocol); here they run on the host so the logic is testable without hardware.
-Since the keypad is not physically wired, keypad tests feed stubbed matrix
-snapshots (lists of 0/1) rather than reading real GPIO.
+Tests feed raw button levels / ring commands plus a synthetic millisecond
+clock — no struct layouts are mirrored in Python (the shim flattens them).
 """
 import ctypes
 import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_LIB = os.path.join(_HERE, "host", "libkeypadcore.so")
+_LIB = os.path.join(_HERE, "host", "libpanelcore.so")
 
-# Event types (keypad.h)
-EV_DOWN, EV_UP, EV_REPEAT = 0, 1, 2
-# Light modes (lighting.h)
-OFF, SOLID, BLINK, PULSE = 0, 1, 2, 3
-# Command types (protocol.h)
-CMD_NONE, CMD_LIGHT, CMD_CONFIG, CMD_PING, CMD_UNKNOWN = 0, 1, 2, 3, 4
+# Command types — order MUST mirror the proto_cmd_type enum in protocol.h.
+CMD_NONE, CMD_RING, CMD_LAMP, CMD_CONFIG, CMD_PING, CMD_OTA, CMD_UNKNOWN = range(7)
+# Pixel orders (rings.h ring_order_t)
+ORDER_GRB, ORDER_RGB = 0, 1
 
 
 def load():
     lib = ctypes.CDLL(_LIB)
+    ci, cu32, cvp, cc = (ctypes.c_int, ctypes.c_uint32, ctypes.c_void_p,
+                         ctypes.c_char_p)
+    pi, pu32 = ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_uint32)
 
-    lib.kp_new.restype = ctypes.c_void_p
-    lib.kp_new.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
-    lib.kp_free.argtypes = [ctypes.c_void_p]
-    lib.kp_ghost.restype = ctypes.c_int
-    lib.kp_ghost.argtypes = [ctypes.POINTER(ctypes.c_int)]
-    lib.kp_update.restype = ctypes.c_int
-    lib.kp_update.argtypes = [
-        ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_uint32,
-        ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int), ctypes.c_int,
-    ]
-    lib.kp_rows.restype = ctypes.c_int
-    lib.kp_cols.restype = ctypes.c_int
+    # buttons
+    lib.bt_new.restype = cvp
+    lib.bt_new.argtypes = [ci]
+    lib.bt_free.argtypes = [cvp]
+    lib.bt_set_debounce.argtypes = [cvp, ci]
+    lib.bt_update.restype = ci
+    lib.bt_update.argtypes = [cvp, ci, ci, cu32, pi, pi, ci]
+    lib.bt_pressed.restype = ci
+    lib.bt_pressed.argtypes = [cvp, ci]
+    lib.bt_count.restype = ci
 
-    lib.li_new.restype = ctypes.c_void_p
-    lib.li_free.argtypes = [ctypes.c_void_p]
-    lib.li_set.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
-                           ctypes.c_int, ctypes.c_uint32]
-    lib.li_duty.restype = ctypes.c_int
-    lib.li_duty.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    # rings
+    lib.rg_new.restype = cvp
+    lib.rg_new.argtypes = [ci, ci]
+    lib.rg_free.argtypes = [cvp]
+    lib.rg_set.restype = ci
+    lib.rg_set.argtypes = [cvp, ci, ci, ci, ci, ci]
+    lib.rg_scale.restype = ci
+    lib.rg_scale.argtypes = [ci, ci]
+    lib.rg_pixel_word.restype = cu32
+    lib.rg_pixel_word.argtypes = [cvp, ci, ci]
+    lib.rg_render.restype = ci
+    lib.rg_render.argtypes = [cvp, ci, ci, pu32, ci]
+    lib.rg_dirty.restype = ci
+    lib.rg_dirty.argtypes = [cvp, ci]
+    lib.rg_clear_dirty.argtypes = [cvp, ci]
+    lib.rg_count.restype = ci
 
-    lib.pp_parse.restype = ctypes.c_int
-    lib.pp_parse.argtypes = [
-        ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int,
-        ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
-        ctypes.POINTER(ctypes.c_int),
-    ]
-    cc, ci, cz, cu = ctypes.c_char_p, ctypes.c_int, ctypes.c_size_t, ctypes.c_uint32
-    lib.proto_fmt_key.restype = ci
-    lib.proto_fmt_key.argtypes = [cc, cz, cc, cc, cu]
-    lib.proto_fmt_hello.restype = ci
-    lib.proto_fmt_hello.argtypes = [cc, cz, cc, ci, cc]
-    lib.proto_fmt_ack.restype = ci
-    lib.proto_fmt_ack.argtypes = [cc, cz, cc]
-    lib.proto_fmt_err.restype = ci
-    lib.proto_fmt_err.argtypes = [cc, cz, cc]
+    # protocol
+    lib.pp_parse.restype = ci
+    lib.pp_parse.argtypes = [cc, pi, pi, pi, pi, pi, pi, pi, pi]
+    lib.pf_btn.restype = ci
+    lib.pf_btn.argtypes = [cc, ci, ci, ci, cu32]
+    lib.pf_hello.restype = ci
+    lib.pf_hello.argtypes = [cc, ci, cc, ci, ci, ci, ci, cc]
+    lib.pf_ack.restype = ci
+    lib.pf_ack.argtypes = [cc, ci, cc]
+    lib.pf_err.restype = ci
+    lib.pf_err.argtypes = [cc, ci, cc]
     return lib
 
 
-class Keypad:
-    """Wraps a keypad_t; feed stubbed snapshots, get events back."""
+class Buttons:
+    """Wraps a buttons_t; feed (raw0, raw1) levels at now_ms, get edge events."""
 
-    def __init__(self, lib, debounce_ms, repeat_delay_ms, repeat_rate_ms):
+    def __init__(self, lib, debounce_ms=30):
         self.lib = lib
-        self.rows = lib.kp_rows()
-        self.cols = lib.kp_cols()
-        self.n = self.rows * self.cols
-        self.h = lib.kp_new(debounce_ms, repeat_delay_ms, repeat_rate_ms)
+        self.n = lib.bt_count()
+        self.h = lib.bt_new(debounce_ms)
 
-    def _flat(self, snapshot):
-        """snapshot: rows x cols nested list, or flat list of len rows*cols."""
-        if snapshot and isinstance(snapshot[0], (list, tuple)):
-            flat = [int(bool(v)) for row in snapshot for v in row]
-        else:
-            flat = [int(bool(v)) for v in snapshot]
-        assert len(flat) == self.n, f"expected {self.n} cells"
-        return (ctypes.c_int * self.n)(*flat)
+    def update(self, raw, now_ms, max_events=8):
+        """raw: sequence of two truthy/falsy levels. Returns [(id, pressed)]."""
+        r0, r1 = (int(bool(v)) for v in raw)
+        ids = (ctypes.c_int * max_events)()
+        prs = (ctypes.c_int * max_events)()
+        n = self.lib.bt_update(self.h, r0, r1, now_ms, ids, prs, max_events)
+        return [(ids[i], bool(prs[i])) for i in range(n)]
 
-    def ghost(self, snapshot):
-        return bool(self.lib.kp_ghost(self._flat(snapshot)))
+    def pressed(self, idx):
+        return bool(self.lib.bt_pressed(self.h, idx))
 
-    def update(self, snapshot, now_ms, max_events=32):
-        arr = self._flat(snapshot)
-        types = (ctypes.c_int * max_events)()
-        rows = (ctypes.c_int * max_events)()
-        cols = (ctypes.c_int * max_events)()
-        n = self.lib.kp_update(self.h, arr, now_ms, types, rows, cols, max_events)
-        return [(types[i], rows[i], cols[i]) for i in range(n)]
+    def set_debounce(self, debounce_ms):
+        self.lib.bt_set_debounce(self.h, debounce_ms)
 
     def free(self):
-        self.lib.kp_free(self.h)
+        self.lib.bt_free(self.h)
 
 
-class Lighting:
-    def __init__(self, lib):
+class Rings:
+    """Wraps a rings_t (two rings with independent LED counts)."""
+
+    def __init__(self, lib, nleds=(16, 16)):
         self.lib = lib
-        self.h = lib.li_new()
+        self.nleds = tuple(nleds)
+        self.h = lib.rg_new(self.nleds[0], self.nleds[1])
 
-    def set(self, mode, brightness_pct, hz, now_ms):
-        self.lib.li_set(self.h, mode, brightness_pct, hz, now_ms)
+    def set(self, idx, r=-1, g=-1, b=-1, brightness=-1):
+        return bool(self.lib.rg_set(self.h, idx, r, g, b, brightness))
 
-    def duty(self, now_ms):
-        return self.lib.li_duty(self.h, now_ms)
+    def pixel_word(self, idx, order=ORDER_GRB):
+        return self.lib.rg_pixel_word(self.h, idx, order)
+
+    def render(self, idx, order=ORDER_GRB, max_words=None):
+        """Returns the rendered word list, or None if rejected (-1 from C)."""
+        if max_words is None:
+            max_words = max(self.nleds)
+        words = (ctypes.c_uint32 * max(max_words, 1))()
+        n = self.lib.rg_render(self.h, idx, order, words, max_words)
+        if n < 0:
+            return None
+        return [words[i] for i in range(n)]
+
+    def dirty(self, idx):
+        return bool(self.lib.rg_dirty(self.h, idx))
+
+    def clear_dirty(self, idx):
+        self.lib.rg_clear_dirty(self.h, idx)
 
     def free(self):
-        self.lib.li_free(self.h)
+        self.lib.rg_free(self.h)
+
+
+def scale(lib, c, brightness):
+    """rings_scale exposed directly: (c*brightness+127)/255 round-to-nearest."""
+    return lib.rg_scale(c, brightness)
 
 
 def parse_cmd(lib, line):
-    pat = ctypes.create_string_buffer(16)
-    b = ctypes.c_int()
-    hz = ctypes.c_int()
-    deb = ctypes.c_int()
-    rd = ctypes.c_int()
-    rr = ctypes.c_int()
-    t = lib.pp_parse(line.encode(), pat, 16,
-                     ctypes.byref(b), ctypes.byref(hz),
-                     ctypes.byref(deb), ctypes.byref(rd), ctypes.byref(rr))
+    vals = [ctypes.c_int() for _ in range(8)]
+    found = lib.pp_parse(line.encode(), *(ctypes.byref(v) for v in vals))
+    t, id_, r, g, b, br, on, deb = (v.value for v in vals)
     return {
-        "type": t, "pattern": pat.value.decode(),
-        "brightness": b.value, "hz": hz.value,
-        "debounce_ms": deb.value, "repeat_delay_ms": rd.value,
-        "repeat_rate_ms": rr.value,
+        "found": bool(found), "type": t, "id": id_,
+        "r": r, "g": g, "b": b, "brightness": br,
+        "on": on, "debounce_ms": deb,
     }
 
 
-def _buf():
-    return ctypes.create_string_buffer(128)
-
-def fmt_key(lib, key, edge, ms):
-    b = _buf()
-    rc = lib.proto_fmt_key(b, 128, key.encode(), edge.encode(), ms)
+def fmt_btn(lib, id_, pressed, ms, bufn=128):
+    b = ctypes.create_string_buffer(bufn)
+    rc = lib.pf_btn(b, bufn, id_, int(bool(pressed)), ms)
     return rc, b.value.decode()
 
-def fmt_hello(lib, fw, keys, ip):
-    b = _buf()
-    rc = lib.proto_fmt_hello(b, 128, fw.encode(), keys, ip.encode())
+def fmt_hello(lib, fw, nleds, pressed, ip, bufn=160):
+    b = ctypes.create_string_buffer(bufn)
+    rc = lib.pf_hello(b, bufn, fw.encode(), nleds[0], nleds[1],
+                      int(bool(pressed[0])), int(bool(pressed[1])), ip.encode())
     return rc, b.value.decode()
 
-def fmt_ack(lib, cmd):
-    b = _buf()
-    rc = lib.proto_fmt_ack(b, 128, cmd.encode())
+def fmt_ack(lib, cmd, bufn=128):
+    b = ctypes.create_string_buffer(bufn)
+    rc = lib.pf_ack(b, bufn, cmd.encode())
     return rc, b.value.decode()
 
-def fmt_err(lib, msg):
-    b = _buf()
-    rc = lib.proto_fmt_err(b, 128, msg.encode())
+def fmt_err(lib, msg, bufn=128):
+    b = ctypes.create_string_buffer(bufn)
+    rc = lib.pf_err(b, bufn, msg.encode())
     return rc, b.value.decode()

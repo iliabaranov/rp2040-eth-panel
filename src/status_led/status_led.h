@@ -8,8 +8,8 @@
  * from a static-fallback address (amber). Non-blocking: call status_led_task()
  * frequently from the main loop.
  */
-#ifndef KEYPAD_STATUS_LED_H
-#define KEYPAD_STATUS_LED_H
+#ifndef PANEL_STATUS_LED_H
+#define PANEL_STATUS_LED_H
 
 #include <stdint.h>
 
@@ -28,4 +28,4 @@ void status_led_task(void);
  * Channel args are logical r,g,b; used by the color self-test. */
 void status_led_solid(uint8_t r, uint8_t g, uint8_t b);
 
-#endif /* KEYPAD_STATUS_LED_H */
+#endif /* PANEL_STATUS_LED_H */

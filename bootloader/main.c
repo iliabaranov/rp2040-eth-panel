@@ -103,7 +103,7 @@ int main(void) {
 
     /* Recovery: now it's safe to bring up USB stdio for diagnostics. */
     stdio_init_all();
-    printf("\n=== rp2040-eth-keypad bootloader v%s (recovery) ===\n", BL_VERSION);
+    printf("\n=== rp2040-eth-panel bootloader v%s (recovery) ===\n", BL_VERSION);
     recovery_run(); /* CH9120 OTA receiver; ends in a watchdog reset */
     while (1) { tight_loop_contents(); }
 }

@@ -11,8 +11,8 @@
  * and returns a cached IP even with no cable, so "DHCP failed" can't be detected.
  * Choose the mode for the deployment via NET_USE_DHCP.
  */
-#ifndef KEYPAD_NET_H
-#define KEYPAD_NET_H
+#ifndef PANEL_NET_H
+#define PANEL_NET_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -51,4 +51,4 @@ void net_write(const uint8_t *buf, int len);
 /* Convenience: write a NUL-terminated string. */
 void net_write_str(const char *s);
 
-#endif /* KEYPAD_NET_H */
+#endif /* PANEL_NET_H */

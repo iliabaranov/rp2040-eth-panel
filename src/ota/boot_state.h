@@ -4,8 +4,8 @@
  * Used by the bootloader (read decision; write app_valid/attempts) and the app
  * (set app_confirmed). Uses the Pico flash API, so firmware-only.
  */
-#ifndef KEYPAD_OTA_BOOT_STATE_H
-#define KEYPAD_OTA_BOOT_STATE_H
+#ifndef PANEL_OTA_BOOT_STATE_H
+#define PANEL_OTA_BOOT_STATE_H
 
 #include <stdbool.h>
 #include "ota/layout.h"
@@ -18,4 +18,4 @@ bool boot_state_read(boot_state_t *out);
  * newest record survives an interrupted write. */
 void boot_state_write(boot_state_t *in);
 
-#endif /* KEYPAD_OTA_BOOT_STATE_H */
+#endif /* PANEL_OTA_BOOT_STATE_H */

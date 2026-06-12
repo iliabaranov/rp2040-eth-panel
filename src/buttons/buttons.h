@@ -24,9 +24,12 @@ typedef struct {
     bool     raw_last[BTN_COUNT];   /* last raw sample */
     uint32_t raw_since_ms[BTN_COUNT]; /* when the raw level last changed */
     uint16_t debounce_ms;
+    bool     initialized;           /* first update seeds state, no events */
 } buttons_t;
 
-/* Initialize: all buttons released, raw history seeded as released. */
+/* Initialize. The FIRST buttons_update() call seeds the stable state from the
+ * raw sample without emitting events, so a button held at boot doesn't fire a
+ * phantom edge (its state still reaches the host via the hello line). */
 void buttons_init(buttons_t *bs, uint16_t debounce_ms);
 
 /* Change the debounce window at runtime (applies from the next sample). */

@@ -7,8 +7,8 @@
  * Flash: 4 MB W25Q32, XIP base 0x10000000. Offsets (for flash_range_* APIs) are
  * relative to the start of flash; XIP addresses are offset + 0x10000000.
  */
-#ifndef KEYPAD_OTA_LAYOUT_H
-#define KEYPAD_OTA_LAYOUT_H
+#ifndef PANEL_OTA_LAYOUT_H
+#define PANEL_OTA_LAYOUT_H
 
 #include <stdint.h>
 
@@ -50,4 +50,4 @@ typedef struct {
     uint32_t crc32;          /* CRC32 over all preceding bytes */
 } boot_state_t;
 
-#endif /* KEYPAD_OTA_LAYOUT_H */
+#endif /* PANEL_OTA_LAYOUT_H */

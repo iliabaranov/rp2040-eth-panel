@@ -15,8 +15,8 @@ the whole flash on a fresh connection if any phase fails (a half-written slot is
 harmless — the bootloader stays in recovery and CRC gates the boot).
 
 Usage:
-    tools/ota_flash.py --host 10.74.29.13 build/keypad.bin
-    tools/ota_flash.py --host 10.74.29.13 --in-recovery build/keypad.bin
+    tools/ota_flash.py --host 10.74.29.13 build/panel.bin
+    tools/ota_flash.py --host 10.74.29.13 --in-recovery build/panel.bin
 """
 import argparse
 import socket

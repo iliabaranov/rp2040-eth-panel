@@ -23,7 +23,7 @@ fi
 echo "[provision] loading bootloader -> 0x10000000"
 pt load build/bootloader.uf2 || { echo "bootloader load FAILED (put the board in BOOTSEL: hold BOOTSEL, tap RESET)"; exit 1; }
 echo "[provision] loading application -> 0x10040000"
-pt load build/keypad.uf2 || { echo "app load FAILED"; exit 1; }
+pt load build/panel.uf2 || { echo "app load FAILED"; exit 1; }
 echo "[provision] rebooting into flash (bootloader -> app)"
 pt reboot || true
 echo "[provision] done"

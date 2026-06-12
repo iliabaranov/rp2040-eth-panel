@@ -21,6 +21,16 @@ void buttons_set_debounce(buttons_t *bs, uint16_t debounce_ms) {
 
 int buttons_update(buttons_t *bs, const bool raw[BTN_COUNT], uint32_t now_ms,
                    btn_event *evs, int max_events) {
+    if (!bs->initialized) {
+        /* Seed from the first snapshot: a button held at boot emits no edge. */
+        for (int i = 0; i < BTN_COUNT; i++) {
+            bs->stable[i] = raw[i];
+            bs->raw_last[i] = raw[i];
+            bs->raw_since_ms[i] = now_ms;
+        }
+        bs->initialized = true;
+        return 0;
+    }
     int ne = 0;
     for (int i = 0; i < BTN_COUNT; i++) {
         if (raw[i] != bs->raw_last[i]) {
