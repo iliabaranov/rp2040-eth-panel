@@ -48,6 +48,10 @@ class PanelExample(Node):
         # One TCP connection to the panel. (Kept simple: if it isn't reachable,
         # create_connection raises and the program exits with the error.)
         self.sock = socket.create_connection((host, port), timeout=5)
+        # create_connection's timeout stays on the socket; clear it so recv()
+        # blocks until data arrives instead of raising socket.timeout after 5s of
+        # no button activity (which would otherwise kill the reader thread).
+        self.sock.settimeout(None)
         self.get_logger().info(f"connected to {host}:{port}")
 
         # Publishers: one Bool per button, True when pressed.
