@@ -4,9 +4,11 @@ Connects as a TCP client to the panel's line-delimited JSON server. The CH9120
 bridge supports exactly ONE client: do not run tools/panel_live.py and this
 driver at the same time.
 
-Published (latched: RELIABLE + TRANSIENT_LOCAL, depth 1):
+Published (latched: RELIABLE + TRANSIENT_LOCAL, depth 10):
   ~/button1/pressed, ~/button2/pressed (std_msgs/Bool)
-      Initial state from the hello line, then every down/up edge.
+      Initial state from the hello line, then every down/up edge. Depth 10 (not 1)
+      so a rapid press/release burst isn't coalesced before a subscriber reads it;
+      TRANSIENT_LOCAL still latches recent samples for late joiners.
 
 Subscribed:
   ~/ring1/color, ~/ring2/color (std_msgs/ColorRGBA)
@@ -62,8 +64,10 @@ class PanelDriver(Node):
             return
 
         # Latched button state: late subscribers immediately get current state.
+        # Depth 10 (not 1) so a quick press+release burst isn't coalesced away
+        # before a subscriber reads it; TRANSIENT_LOCAL keeps the latch behaviour.
         latched = QoSProfile(
-            depth=1,
+            depth=10,
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
@@ -82,6 +86,7 @@ class PanelDriver(Node):
         # to ROS's view after reboots / OTA / cable blips.
         self._ring_cmds: dict[int, str | None] = {rid: None for rid in RING_IDS}
         self._lamp_cmd: str | None = None
+        self._a_zero_warned = False  # warn once about a=0 (ColorRGBA default), not per-msg
 
         # The socket is owned by the reader thread; subscription callbacks run
         # in the executor thread and send through it. _sock_lock serializes
@@ -164,10 +169,12 @@ class PanelDriver(Node):
 
     def _on_ring(self, ring_id: int, msg: ColorRGBA):
         r8, g8, b8, br8 = color_rgba_to_bytes(msg.r, msg.g, msg.b, msg.a)
-        if msg.a == 0.0:
+        if br8 == 0 and not self._a_zero_warned:
+            self._a_zero_warned = True
             self.get_logger().warn(
-                f"ring{ring_id}: a=0.0 -> brightness 0 (OFF). The a channel "
-                "is brightness; ColorRGBA defaults it to 0 — set it explicitly."
+                f"ring{ring_id}: a -> brightness 0 (OFF). The a channel is "
+                "brightness; ColorRGBA defaults it to 0 — set it explicitly. "
+                "(This warning is shown once.)"
             )
         line = fmt_ring_cmd(ring_id, r8, g8, b8, br8)
         self._ring_cmds[ring_id] = line
@@ -190,8 +197,15 @@ class PanelDriver(Node):
             try:
                 s.sendall(line.encode("utf-8"))
             except OSError as e:
+                # A partial/failed write may have left a half-line on the wire,
+                # corrupting framing. Tear the connection down so the reader loop
+                # reconnects and _resync() replays the cache onto a clean stream.
                 self.get_logger().warn(
-                    f"send failed ({e}); will resync on reconnect")
+                    f"send failed ({e}); dropping connection to resync")
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
 
     def _resync(self):
         """Replay all cached desired state (called on every hello)."""
@@ -210,6 +224,24 @@ class PanelDriver(Node):
     def destroy_node(self):
         if hasattr(self, "_stop"):
             self._stop.set()
+        # Unblock the reader thread's recv() by tearing down the socket, then join
+        # it so we don't leak a thread or race on shutdown.
+        if hasattr(self, "_sock_lock"):
+            with self._sock_lock:
+                s = self._sock
+                self._sock = None
+            if s is not None:
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                try:
+                    s.close()
+                except OSError:
+                    pass
+        t = getattr(self, "_thread", None)
+        if t is not None:
+            t.join(timeout=2.0)
         return super().destroy_node()
 
 
