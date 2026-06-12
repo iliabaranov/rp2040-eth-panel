@@ -81,8 +81,8 @@ via a driver, the lamp supply).
 
 ### CH9120 networking
 The RP2040 holds CFG low, sends config frames (`0x57 0xAB <cmd> <data>`) at 9600 baud to
-set mode/IP/subnet/gateway/port and the data baud, commits (`0x0d`,`0x0e`,`0x5e`),
-releases CFG, and switches UART1 to 115200. Thereafter UART1 is a transparent pipe to
+set mode/IP/subnet/gateway/port and the data baud, commits (`0x0d` save, `0x0e`
+execute+reset), releases CFG, and switches UART1 to 115200. Thereafter UART1 is a transparent pipe to
 the TCP socket — the protocol layer just reads/writes bytes. `net_peer_connected()`
 reflects the TCPS pin. See `src/net/net.c`.
 

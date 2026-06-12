@@ -10,7 +10,7 @@
  *   {"t":"btn","id":1,"e":"down","ms":123456}
  *   {"t":"btn","id":1,"e":"up","ms":124102}
  *   {"t":"ack","cmd":"ring"}
- *   {"t":"err","msg":"bad ring id"}
+ *   {"t":"err","msg":"bad ring cmd"}
  *
  * Host -> device:
  *   {"cmd":"ring","id":1,"r":255,"g":64,"b":0,"brightness":128}   (absent fields keep current)

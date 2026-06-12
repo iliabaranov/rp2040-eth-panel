@@ -1,7 +1,7 @@
 # panel_driver (ROS 2 Humble)
 
-ROS 2 **Humble** (`rclpy`) driver for the RP2040-ETH operator panel (2 illuminated
-buttons, 2×16 WS2812 LED rings). Connects as a TCP client to the device's
+ROS 2 **Humble** (`rclpy`) driver for the RP2040-ETH operator panel (2 buttons —
+one illuminated — and 2×16 WS2812 LED rings). Connects as a TCP client to the device's
 line-delimited JSON server and bridges it to ROS topics in both directions.
 
 > **Single TCP client only.** The CH9120 Ethernet bridge wedges if a second

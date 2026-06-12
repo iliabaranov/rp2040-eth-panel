@@ -123,7 +123,7 @@ single-client server that buffers across connections. Two field-failure classes 
 from this, both now defended on *both* ends:
 
 - **Framing desync from stray/stale bytes.** A dropped or retried connection (e.g. the
-  host's `wait_for_recovery` probing SYNC) can leave bytes buffered in the bridge that
+  host's `ensure_recovery` probing SYNC) can leave bytes buffered in the bridge that
   arrive on the *next* connection, or a late duplicate response can precede the one
   expected. If either end consumed a fixed 4 bytes as "the next token", a single
   misaligned byte shifted *all* subsequent frames — so the push timed out at a

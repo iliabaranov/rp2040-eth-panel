@@ -28,6 +28,7 @@ bootloader/   immutable first-stage bootloader (boot select + OTA recovery recei
 src/          application: net (CH9120), buttons, rings, status LED, protocol, ota
 linker/       app (0x10040000) and bootloader (0x10000000, 256 KB) memory maps
 ros2/panel_driver/   ROS 2 (Humble) driver: button topics in, ring/lamp topics out
+examples/     standalone single-file ROS 2 driver (run directly — no colcon build)
 test/         pytest + ctypes tests for the pure logic (buttons/rings/protocol) + OTA sim
 tools/        flash / monitor / OTA / provision / live & mock helpers
 ```
@@ -134,7 +135,20 @@ The driver owns desired state: it caches the last commanded ring colors and lamp
 and **re-sends them whenever the device reconnects** (the device emits a `hello` line on
 every TCP connect precisely to trigger this). The firmware deliberately persists
 nothing — see [`docs/DESIGN.md`](docs/DESIGN.md). Single TCP client only: stop
-`panel_live.py` before launching the driver.
+`panel_live.py` (and any other driver) before launching the driver.
+
+### Standalone example (no build)
+For a minimal, copy-pasteable starting point, [`examples/standalone_panel_driver.py`](examples/standalone_panel_driver.py)
+is a ~100-line single-file driver you run directly — no colcon build, no package, no
+launch file:
+```bash
+source /opt/ros/humble/setup.bash
+python3 examples/standalone_panel_driver.py <device-ip>
+ros2 topic echo /button1_pressed          # plain names: /button{1,2}_pressed, /ring{1,2}_color, /button1_light
+```
+It publishes only on a press (no latched startup state), so `echo` stays quiet until you
+press. Use the `panel_driver` package above for production (auto-reconnect, desired-state
+resync, latched state, clean shutdown).
 
 ## Tests
 ```bash
