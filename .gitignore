@@ -1,0 +1,27 @@
+# Build
+build/
+build-*/
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+
+# Host test artifacts
+test/host/build/
+*.so
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+
+# ROS 2 / colcon
+ros2/build/
+ros2/install/
+ros2/log/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
