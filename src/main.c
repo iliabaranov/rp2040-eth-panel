@@ -44,7 +44,9 @@ static void rings_flush(void) {
     for (int i = 0; i < RING_COUNT; i++) {
         if (!s_rings.dirty[i]) continue;
         int n = rings_render(&s_rings, i, RING_ORDER, words, RING_MAX_LEDS);
-        if (n > 0) rings_hw_push(i, words, n);
+        if (n < 0) continue; /* render failed (LED count > RING_MAX_LEDS) — keep
+                              * dirty so a corrected frame still gets pushed later */
+        rings_hw_push(i, words, n);
         rings_clear_dirty(&s_rings, i);
     }
 }
@@ -200,9 +202,21 @@ int main(void) {
            BUTTON1_PIN, BUTTON2_PIN, LAMP_PIN, RING1_PIN, RING2_PIN,
            RING1_NUM_LEDS, RING2_NUM_LEDS);
 
+    /* Seed the debouncer from the current pin levels BEFORE the loop, so the very
+     * first hello (which can fire on the same iteration as the first peer connect)
+     * reports the true button state — e.g. a button held across a reboot/OTA. The
+     * seeding update emits no edge events (by design); state reaches the host via
+     * hello and any later release/press then produces a normal edge. */
+    {
+        bool raw0[BTN_COUNT];
+        buttons_hw_read(raw0);
+        buttons_update(&s_buttons, raw0, to_ms_since_boot(get_absolute_time()), NULL, 0);
+    }
+
     bool      peer_was_connected = false;
     char      linebuf[256];
     size_t    linelen = 0;
+    bool      discard = false; /* true while skipping an overlong line to its '\n' */
     uint8_t   rxbuf[128];
     btn_event evs[BTN_COUNT * 2];
 
@@ -212,8 +226,10 @@ int main(void) {
         /* Hello on every TCP peer connect so the host can resync state. */
         bool peer = net_peer_connected();
         if (peer && !peer_was_connected) {
+            net_rx_flush();    /* drop stale bytes left by the previous client */
             send_hello(&st);
-            linelen = 0; /* drop any half-line from a previous connection */
+            linelen = 0;       /* drop any half-line from a previous connection */
+            discard = false;
         }
         peer_was_connected = peer;
 
@@ -235,13 +251,22 @@ int main(void) {
         for (int i = 0; i < n; i++) {
             char ch = (char)rxbuf[i];
             if (ch == '\n') {
-                linebuf[linelen] = '\0';
-                if (linelen > 0) dispatch(linebuf);
+                /* Newline ends a line — or ends an overlong line we were skipping.
+                 * Either way, resync to a clean line boundary here. */
+                if (!discard) {
+                    linebuf[linelen] = '\0';
+                    if (linelen > 0) dispatch(linebuf);
+                }
                 linelen = 0;
+                discard = false;
+            } else if (discard) {
+                /* Mid-overlong-line: keep skipping until the next newline so a
+                 * trailing fragment can never be dispatched as a command. */
             } else if (linelen < sizeof(linebuf) - 1) {
                 linebuf[linelen++] = ch;
             } else {
-                /* Overlong line: drop it (resync at the next newline). */
+                /* Overflow: enter discard until the next newline (emit one err). */
+                discard = true;
                 linelen = 0;
                 send_err("line too long");
             }

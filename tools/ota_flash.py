@@ -101,11 +101,11 @@ def send_trigger(s):
     running app wedges it. The ack matters: just after a reboot the app spends ~10 s
     reconfiguring the CH9120, during which it isn't reading the socket, so a blind
     one-shot trigger is easily lost — we must verify it landed and otherwise re-send."""
+    got = b""
     try:
         drain(s, settle=0.2)
         s.sendall(b'{"cmd":"ota"}\n')
         s.settimeout(3.0)
-        got = b""
         while b'"ack"' not in got:
             d = s.recv(256)
             if not d:

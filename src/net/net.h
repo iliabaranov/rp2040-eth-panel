@@ -45,6 +45,10 @@ bool net_peer_connected(void);
 /* Non-blocking read of up to max bytes from the TCP stream. Returns count. */
 int net_read(uint8_t *buf, int max);
 
+/* Discard any buffered inbound bytes (RX ring + UART FIFO). Use on a new peer
+ * connection so a stale line from the previous client can't be mis-dispatched. */
+void net_rx_flush(void);
+
 /* Write len bytes to the TCP stream (blocking on the UART FIFO). */
 void net_write(const uint8_t *buf, int len);
 

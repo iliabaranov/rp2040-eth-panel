@@ -36,6 +36,11 @@ static absolute_time_t s_next;
 /* This board's WS2812B latches bytes in RGB order (verified by self-test: with
  * GRB packing, "green" showed red). Send red, then green, then blue. */
 static void put_color(uint8_t r, uint8_t g, uint8_t b) {
+    /* Guarantee the WS2812 reset/latch gap (>=280us for modern WS2812B) since the
+     * previous frame, so two writes close together (e.g. init's off-frame followed
+     * immediately by the boot-blue solid) don't fuse into one stream and get
+     * dropped. The octet flasher's phases are >=180ms, so this is otherwise free. */
+    sleep_us(300);
     uint32_t rgb = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
     pio_sm_put_blocking(s_pio, s_sm, rgb << 8u);
 }

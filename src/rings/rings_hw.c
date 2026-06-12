@@ -22,6 +22,11 @@ void rings_hw_init(void) {
 
 void rings_hw_push(int idx, const uint32_t *words, int count) {
     if (idx < 0 || idx >= RING_COUNT) return;
+    /* Ensure the WS2812 reset/latch gap (>=280us) since the previous frame on this
+     * chain, so a frame pushed shortly after another (e.g. the boot all-off flush
+     * immediately followed by the first commanded/self-test color) latches instead
+     * of fusing. Rings are command-driven, so this brief wait is not on a hot path. */
+    sleep_us(300);
     for (int i = 0; i < count; i++) {
         /* 24-bit pixel in the top bits, as the PIO's left-shift autopull expects. */
         pio_sm_put_blocking(RINGS_PIO, (uint)idx, words[i] << 8u);

@@ -23,6 +23,7 @@
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include "hardware/irq.h"
 
 /* CH9120 command codes */
 #define CMD_VERSION    0x01
@@ -42,6 +43,49 @@
 #define ACK 0xAA
 
 static net_status_t s_status;
+
+/* ---- interrupt-driven RX ring buffer ----
+ * The PL011 RX FIFO is only 32 bytes (~2.8 ms at 115200), and the super-loop can
+ * block for several ms inside uart_write_blocking (hello/acks) and the PIO ring
+ * pushes. Polling net_read once per pass would drop inbound command bytes during
+ * those stalls. A UART RX IRQ drains the hardware FIFO into this software ring on
+ * every byte burst, and net_read() consumes the ring — so the loop's blocking
+ * work no longer costs us inbound bytes. Sized to absorb a realistic burst while
+ * the loop is busy (~17 ms of full-rate inbound). The IRQ is enabled only AFTER
+ * config-mode setup completes (config uses direct FIFO reads). */
+#define RX_RING_SIZE 2048u            /* power of two */
+#define RX_RING_MASK (RX_RING_SIZE - 1u)
+static volatile uint8_t  s_rx_ring[RX_RING_SIZE];
+static volatile uint32_t s_rx_head;   /* producer: IRQ */
+static volatile uint32_t s_rx_tail;   /* consumer: net_read */
+static volatile uint32_t s_rx_overruns;
+static bool              s_rx_irq_inited;
+
+static void net_rx_irq(void) {
+    while (uart_is_readable(CH9120_UART)) {
+        uint8_t c = (uint8_t)uart_getc(CH9120_UART);
+        uint32_t next = (s_rx_head + 1u) & RX_RING_MASK;
+        if (next == s_rx_tail) {
+            s_rx_overruns++;  /* ring full — drop the byte but keep draining the
+                               * HW FIFO so it can't overrun and stall the IRQ */
+            continue;
+        }
+        s_rx_ring[s_rx_head] = c;
+        s_rx_head = next;
+    }
+}
+
+static void rx_irq_enable(void) {
+    if (s_rx_irq_inited) return;
+    s_rx_head = s_rx_tail = 0;
+    int uart_irq = (CH9120_UART == uart0) ? UART0_IRQ : UART1_IRQ;
+    irq_set_exclusive_handler(uart_irq, net_rx_irq);
+    irq_set_enabled(uart_irq, true);
+    /* rx=true enables both the RX-level and RX-timeout interrupts, so short
+     * bursts (< the FIFO threshold) are delivered promptly too. tx=false. */
+    uart_set_irq_enables(CH9120_UART, true, false);
+    s_rx_irq_inited = true;
+}
 
 /* ---- low-level UART helpers ---- */
 static void rx_flush(void) {
@@ -184,6 +228,7 @@ bool net_init(net_status_t *out) {
     /* Switch to the data baud — UART1 is now a transparent TCP pipe. */
     uart_set_baudrate(CH9120_UART, CH9120_DATA_BAUD);
     rx_flush();
+    rx_irq_enable(); /* from here, inbound bytes are buffered by the RX IRQ */
 
     printf("[net] CH9120 mode=%d ipmode=%s port=%u\n",
            NET_MODE, s_status.dhcp_mode ? "DHCP" : "static", s_status.port);
@@ -218,6 +263,7 @@ void net_attach_data_mode(void) {
     gpio_pull_up(CH9120_PIN_TCPS);
 
     while (uart_is_readable(CH9120_UART)) (void)uart_getc(CH9120_UART);
+    rx_irq_enable(); /* recovery path: buffer inbound bytes via the RX IRQ too */
 }
 
 bool net_peer_connected(void) {
@@ -226,10 +272,26 @@ bool net_peer_connected(void) {
 
 int net_read(uint8_t *buf, int max) {
     int n = 0;
-    while (n < max && uart_is_readable(CH9120_UART)) {
-        buf[n++] = uart_getc(CH9120_UART);
+    if (!s_rx_irq_inited) {
+        /* IRQ not yet armed (shouldn't happen post-init): read the FIFO directly. */
+        while (n < max && uart_is_readable(CH9120_UART)) {
+            buf[n++] = uart_getc(CH9120_UART);
+        }
+        return n;
+    }
+    while (n < max && s_rx_tail != s_rx_head) {
+        buf[n++] = s_rx_ring[s_rx_tail];
+        s_rx_tail = (s_rx_tail + 1u) & RX_RING_MASK;
     }
     return n;
+}
+
+void net_rx_flush(void) {
+    if (s_rx_irq_inited) {
+        s_rx_tail = s_rx_head; /* drop everything buffered by the IRQ */
+    } else {
+        while (uart_is_readable(CH9120_UART)) (void)uart_getc(CH9120_UART);
+    }
 }
 
 void net_write(const uint8_t *buf, int len) {

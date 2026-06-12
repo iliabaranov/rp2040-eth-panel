@@ -40,14 +40,19 @@ int proto_fmt_err(char *buf, size_t n, const char *msg) {
 static const char *find_key(const char *json, const char *key) {
     char pat[40];
     snprintf(pat, sizeof(pat), "\"%s\"", key);
-    const char *p = strstr(json, pat);
-    if (!p) return NULL;
-    p += strlen(pat);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return NULL;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    return p; /* points at the value */
+    size_t patlen = strlen(pat);
+    /* Scan every occurrence: a quoted string VALUE can match the pattern too
+     * (e.g. {"cmd":"id",...} when looking up key "id"), so only accept a match
+     * that is actually a key — i.e. followed by ':'. Keep looking otherwise. */
+    for (const char *p = strstr(json, pat); p; p = strstr(p + patlen, pat)) {
+        const char *q = p + patlen;
+        while (*q == ' ' || *q == '\t') q++;
+        if (*q != ':') continue;
+        q++;
+        while (*q == ' ' || *q == '\t') q++;
+        return q; /* points at the value */
+    }
+    return NULL;
 }
 
 /* Extract a string value into dst (size dstn). Returns true if found. */

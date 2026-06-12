@@ -39,8 +39,13 @@ int buttons_update(buttons_t *bs, const bool raw[BTN_COUNT], uint32_t now_ms,
         }
         if (raw[i] != bs->stable[i] &&
             (uint32_t)(now_ms - bs->raw_since_ms[i]) >= bs->debounce_ms) {
-            bs->stable[i] = raw[i];
+            /* Only commit the state flip if we can also report the edge — otherwise
+             * the caller would never see this transition and the debounced state
+             * would silently diverge from the emitted event stream. If the buffer
+             * is full, leave stable unchanged so the edge is emitted on a later
+             * call (the raw level is already latched, so timing is preserved). */
             if (ne < max_events) {
+                bs->stable[i] = raw[i];
                 evs[ne].id = i + 1;
                 evs[ne].pressed = raw[i];
                 ne++;
