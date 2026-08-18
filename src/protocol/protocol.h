@@ -22,8 +22,11 @@
  *
  * The hello line is sent unsolicited on each TCP peer connect (TCPS pin edge),
  * but some CH9120 batches never assert TCPS, so hosts must not rely on it:
- * request it with {"cmd":"hello"} after connecting. The reply is the hello
- * event line itself, not an ack.
+ * request it with {"cmd":"hello"} if none arrives shortly after connecting.
+ * The reply is the hello event line itself, not an ack. Do NOT send the
+ * request in the same instant as the connect — on TCPS-working units the
+ * device flushes its RX buffer at the connect edge and can truncate a line
+ * already in flight.
  */
 #ifndef PANEL_PROTOCOL_H
 #define PANEL_PROTOCOL_H

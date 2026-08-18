@@ -18,11 +18,13 @@ Subscribed:
 
 Desired-state resync: the last commanded ring colors and lamp state are cached
 and re-sent on every hello (each (re)connect — device reboot, OTA, cable blip),
-so the panel always converges to ROS's desired state. The driver REQUESTS the
-hello with {"cmd":"hello"} right after connecting instead of waiting for the
-device's unsolicited connect-time hello: some CH9120 batches never assert the
-TCP-status pin that triggers it (fw >= 1.0.3 answers the request; on units
-where both fire, the duplicate hello is a harmless double resync).
+so the panel always converges to ROS's desired state. The driver waits ~1 s
+for the device's unsolicited connect-time hello, then REQUESTS one with
+{"cmd":"hello"} if it hasn't arrived: some CH9120 batches never assert the
+TCP-status pin that triggers it (fw >= 1.0.3 answers the request). The request
+is a fallback, not sent immediately, because on TCPS-working units the device
+flushes its RX buffer at the connect edge and a request already in flight gets
+truncated to a junk line (the device then errs "no cmd").
 
 Parameters:
   host (str, '')          device IP (DHCP-assigned). REQUIRED.
@@ -119,21 +121,32 @@ class PanelDriver(Node):
                         s.settimeout(1.0)
                         with self._sock_lock:
                             self._sock = s
-                        # Ask for the hello rather than relying on the device's
-                        # connect-time one (TCPS is dead on some CH9120 batches).
-                        self._send(fmt_hello_cmd())
+                        # Hello fallback: TCPS-dead CH9120 batches never send
+                        # the connect-time hello, so request one — but only
+                        # after a grace period. Sent immediately, the request
+                        # races the device's connect-edge RX flush on
+                        # TCPS-working units and arrives truncated.
+                        self._hello_seen = False
+                        hello_requested = False
+                        t_conn = time.monotonic()
                         buf = b""
                         while not self._stop.is_set():
                             try:
                                 data = s.recv(256)
+                                if not data:
+                                    raise ConnectionError(
+                                        "peer closed connection")
+                                buf += data
+                                while b"\n" in buf:
+                                    line, buf = buf.split(b"\n", 1)
+                                    self._handle_line(
+                                        line.decode("utf-8", "replace"))
                             except socket.timeout:
-                                continue
-                            if not data:
-                                raise ConnectionError("peer closed connection")
-                            buf += data
-                            while b"\n" in buf:
-                                line, buf = buf.split(b"\n", 1)
-                                self._handle_line(line.decode("utf-8", "replace"))
+                                pass
+                            if (not self._hello_seen and not hello_requested
+                                    and time.monotonic() - t_conn >= 1.0):
+                                hello_requested = True
+                                self._send(fmt_hello_cmd())
                 finally:
                     with self._sock_lock:
                         self._sock = None
@@ -154,6 +167,7 @@ class PanelDriver(Node):
         if t == "btn":
             self._publish_button(ev["id"], ev["e"] == "down")
         elif t == "hello":
+            self._hello_seen = True
             self.get_logger().info(
                 f"panel hello: fw={ev['fw']} ip={ev['ip']} "
                 f"pressed={ev['pressed']}"

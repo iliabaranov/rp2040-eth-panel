@@ -163,9 +163,13 @@ side restarts. This is the hook the ROS driver uses to re-push desired state.
 
 **Do not rely on the unsolicited hello alone:** some CH9120 batches never assert the
 TCPS pin (observed on a 2026 unit — the pin is actively driven but stays HIGH with a
-live TCP connection), so the connect edge never fires. Hosts should send
-`{"cmd":"hello"}` right after connecting (fw ≥ 1.0.3 replies with the hello line); on
-units where TCPS does work, the duplicate hello is a harmless double resync.
+live TCP connection), so the connect edge never fires. Hosts should wait ~1 s for the
+connect-time hello and send `{"cmd":"hello"}` only if it doesn't arrive (fw ≥ 1.0.3
+replies with the hello line) — this is what the ROS driver does. Don't send the
+request immediately on connect: on TCPS-working units the device flushes its RX
+buffer at the connect edge, and a line already in flight gets truncated to junk
+(answered with `{"t":"err","msg":"no cmd"}`). A duplicate hello, if both fire, is a
+harmless double resync.
 
 ### Host → device (commands)
 ```json
