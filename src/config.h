@@ -11,7 +11,7 @@
 #ifndef PANEL_CONFIG_H
 #define PANEL_CONFIG_H
 
-#define FW_VERSION "1.0.2"
+#define FW_VERSION "1.0.3"
 
 /* ---- CH9120 Ethernet bridge (UART1) — fixed by the Waveshare board ---- */
 #define CH9120_UART       uart1

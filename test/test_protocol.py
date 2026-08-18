@@ -5,7 +5,7 @@ part of the wire contract the host-side consumers parse line-by-line.
 """
 import coredef
 from coredef import (CMD_NONE, CMD_RING, CMD_LAMP, CMD_CONFIG, CMD_PING,
-                     CMD_OTA, CMD_UNKNOWN)
+                     CMD_OTA, CMD_HELLO, CMD_UNKNOWN)
 
 
 # ---- device -> host formatters ----
@@ -91,6 +91,10 @@ def test_parse_config(lib):
 def test_parse_ping_and_ota(lib):
     assert coredef.parse_cmd(lib, '{"cmd":"ping"}')["type"] == CMD_PING
     assert coredef.parse_cmd(lib, '{"cmd":"ota"}')["type"] == CMD_OTA
+
+
+def test_parse_hello_request(lib):
+    assert coredef.parse_cmd(lib, '{"cmd":"hello"}')["type"] == CMD_HELLO
 
 
 def test_parse_whitespace_tolerance(lib):

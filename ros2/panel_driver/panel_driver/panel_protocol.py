@@ -12,6 +12,7 @@ Device -> host (parse_event):
 Host -> device (formatters; every line ends with '\n'):
     {"cmd":"ring","id":1,"r":255,"g":64,"b":0,"brightness":128}
     {"cmd":"lamp","on":true}
+    {"cmd":"hello"}   (request the hello line; the reply is the hello event)
 
 Unit-testable standalone: test/test_panel_protocol.py imports this module with
 no ROS graph or environment.
@@ -95,6 +96,16 @@ def fmt_ring_cmd(ring_id: int, r: int, g: int, b: int, brightness: int) -> str:
 def fmt_lamp_cmd(on: bool) -> str:
     """Format a host->device lamp command line (trailing '\n' included)."""
     return '{"cmd":"lamp","on":%s}\n' % ("true" if on else "false")
+
+
+def fmt_hello_cmd() -> str:
+    """Format a host->device hello request line (trailing '\n' included).
+
+    The device replies with the hello event line. Hosts must request the hello
+    after connecting rather than waiting for the unsolicited one: some CH9120
+    batches never assert the TCP-status pin that triggers it.
+    """
+    return '{"cmd":"hello"}\n'
 
 
 def color_rgba_to_bytes(r: float, g: float, b: float,

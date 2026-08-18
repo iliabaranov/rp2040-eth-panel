@@ -12,7 +12,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _LIB = os.path.join(_HERE, "host", "libpanelcore.so")
 
 # Command types — order MUST mirror the proto_cmd_type enum in protocol.h.
-CMD_NONE, CMD_RING, CMD_LAMP, CMD_CONFIG, CMD_PING, CMD_OTA, CMD_UNKNOWN = range(7)
+(CMD_NONE, CMD_RING, CMD_LAMP, CMD_CONFIG, CMD_PING, CMD_OTA, CMD_HELLO,
+ CMD_UNKNOWN) = range(8)
 # Pixel orders (rings.h ring_order_t)
 ORDER_GRB, ORDER_RGB = 0, 1
 

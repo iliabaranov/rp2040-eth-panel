@@ -116,6 +116,8 @@ bool proto_parse(const char *line, proto_cmd *out) {
         out->type = CMD_PING;
     } else if (strcmp(cmd, "ota") == 0) {
         out->type = CMD_OTA;
+    } else if (strcmp(cmd, "hello") == 0) {
+        out->type = CMD_HELLO;
     } else {
         out->type = CMD_UNKNOWN;
     }

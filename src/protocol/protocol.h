@@ -17,7 +17,13 @@
  *   {"cmd":"lamp","on":true}                                      (button 1 illumination)
  *   {"cmd":"config","debounce_ms":30}
  *   {"cmd":"ping"}
+ *   {"cmd":"hello"}                                               (reply = the hello line)
  *   {"cmd":"ota"}                                                 (reboot into OTA recovery)
+ *
+ * The hello line is sent unsolicited on each TCP peer connect (TCPS pin edge),
+ * but some CH9120 batches never assert TCPS, so hosts must not rely on it:
+ * request it with {"cmd":"hello"} after connecting. The reply is the hello
+ * event line itself, not an ack.
  */
 #ifndef PANEL_PROTOCOL_H
 #define PANEL_PROTOCOL_H
@@ -41,6 +47,7 @@ typedef enum {
     CMD_CONFIG,
     CMD_PING,
     CMD_OTA,
+    CMD_HELLO,
     CMD_UNKNOWN,
 } proto_cmd_type;
 

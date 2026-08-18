@@ -4,7 +4,7 @@
 Bidirectional, unlike the keypad mock: speaks the firmware's line-delimited JSON
 protocol on both directions. On client connect it sends a proper hello (with the
 simulated pressed states), then periodically emits btn down/up pairs cycling
-buttons 1 and 2. Inbound ring/lamp/config/ping/ota commands are validated and
+buttons 1 and 2. Inbound ring/lamp/config/ping/hello/ota commands are validated and
 acked/erred exactly as src/main.c + src/protocol/protocol.c would; state changes
 are printed to stdout.
 
@@ -120,6 +120,9 @@ def process(state, line):
 
     if cmd == "ping":
         return fmt_ack("ping"), False
+
+    if cmd == "hello":
+        return fmt_hello(state), False  # reply IS the hello line, no ack
 
     if cmd == "ota":
         return fmt_ack("ota"), True

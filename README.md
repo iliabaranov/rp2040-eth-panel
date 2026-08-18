@@ -132,8 +132,10 @@ Parameters: `host`, `port` (default 5005), `reconnect_period`.
 > with only `r/g/b` set shows nothing. Always set `a` (1.0 = full).
 
 The driver owns desired state: it caches the last commanded ring colors and lamp state
-and **re-sends them whenever the device reconnects** (the device emits a `hello` line on
-every TCP connect precisely to trigger this). The firmware deliberately persists
+and **re-sends them whenever the device reconnects** (the driver requests a `hello`
+line right after each connect precisely to trigger this — it does not rely on the
+device's unsolicited connect-time hello, which never fires on CH9120 batches whose
+TCPS status pin is dead). The firmware deliberately persists
 nothing — see [`docs/DESIGN.md`](docs/DESIGN.md). Single TCP client only: stop
 `panel_live.py` (and any other driver) before launching the driver.
 

@@ -10,7 +10,9 @@
  *
  * On each TCP peer connect (TCPS pin edge) the device sends a hello line with
  * firmware version, ring sizes, and the current button states, so the host can
- * resync state after either side restarts.
+ * resync state after either side restarts. Hosts should also request it with
+ * {"cmd":"hello"} after connecting: some CH9120 batches never assert TCPS, so
+ * the unsolicited hello may never arrive.
  */
 #include <stdio.h>
 #include <string.h>
@@ -108,6 +110,12 @@ static void dispatch(const char *line) {
         break;
     case CMD_PING:
         send_ack("ping");
+        break;
+    case CMD_HELLO:
+        /* Host-requested hello. The reply IS the hello line (no ack). Needed
+         * because some CH9120 batches never assert TCPS, so the edge-triggered
+         * hello below cannot be relied on by hosts. */
+        send_hello(net_status());
         break;
     case CMD_OTA:
         send_ack("ota");

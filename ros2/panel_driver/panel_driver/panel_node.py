@@ -18,7 +18,11 @@ Subscribed:
 
 Desired-state resync: the last commanded ring colors and lamp state are cached
 and re-sent on every hello (each (re)connect — device reboot, OTA, cable blip),
-so the panel always converges to ROS's desired state.
+so the panel always converges to ROS's desired state. The driver REQUESTS the
+hello with {"cmd":"hello"} right after connecting instead of waiting for the
+device's unsolicited connect-time hello: some CH9120 batches never assert the
+TCP-status pin that triggers it (fw >= 1.0.3 answers the request; on units
+where both fire, the duplicate hello is a harmless double resync).
 
 Parameters:
   host (str, '')          device IP (DHCP-assigned). REQUIRED.
@@ -36,7 +40,8 @@ from rclpy.qos import (DurabilityPolicy, QoSProfile, ReliabilityPolicy)
 from std_msgs.msg import Bool, ColorRGBA
 
 from panel_driver.panel_protocol import (
-    color_rgba_to_bytes, fmt_lamp_cmd, fmt_ring_cmd, parse_event,
+    color_rgba_to_bytes, fmt_hello_cmd, fmt_lamp_cmd, fmt_ring_cmd,
+    parse_event,
 )
 
 RING_IDS = (1, 2)
@@ -114,6 +119,9 @@ class PanelDriver(Node):
                         s.settimeout(1.0)
                         with self._sock_lock:
                             self._sock = s
+                        # Ask for the hello rather than relying on the device's
+                        # connect-time one (TCPS is dead on some CH9120 batches).
+                        self._send(fmt_hello_cmd())
                         buf = b""
                         while not self._stop.is_set():
                             try:

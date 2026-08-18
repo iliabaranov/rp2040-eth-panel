@@ -161,12 +161,19 @@ The `hello` is sent on **every TCP peer connect** (TCPS pin edge) — firmware v
 ring sizes, and current debounced button states — so the host can resync after either
 side restarts. This is the hook the ROS driver uses to re-push desired state.
 
+**Do not rely on the unsolicited hello alone:** some CH9120 batches never assert the
+TCPS pin (observed on a 2026 unit — the pin is actively driven but stays HIGH with a
+live TCP connection), so the connect edge never fires. Hosts should send
+`{"cmd":"hello"}` right after connecting (fw ≥ 1.0.3 replies with the hello line); on
+units where TCPS does work, the duplicate hello is a harmless double resync.
+
 ### Host → device (commands)
 ```json
 {"cmd":"ring","id":1,"r":255,"g":64,"b":0,"brightness":128}
 {"cmd":"lamp","on":true}
 {"cmd":"config","debounce_ms":30}
 {"cmd":"ping"}
+{"cmd":"hello"}
 {"cmd":"ota"}
 ```
 - `ring`: `id` 1–2; `r/g/b` 0–255; `brightness` 0–255. **Absent fields keep their
@@ -174,6 +181,7 @@ side restarts. This is the hook the ROS driver uses to re-push desired state.
   one uniform color.
 - `lamp`: button 1's illumination, on/off.
 - `config`: `debounce_ms` 1–1000, applies immediately (not persisted).
+- `hello`: request the hello line; the reply is the hello event itself, not an ack.
 - `ota`: ack, then reboot into bootloader recovery ([`OTA.md`](OTA.md)).
 - Unknown/invalid commands → `{"t":"err",...}`; valid → `{"t":"ack",...}`.
 

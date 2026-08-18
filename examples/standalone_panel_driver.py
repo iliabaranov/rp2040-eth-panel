@@ -53,6 +53,10 @@ class PanelExample(Node):
         # no button activity (which would otherwise kill the reader thread).
         self.sock.settimeout(None)
         self.get_logger().info(f"connected to {host}:{port}")
+        # Request the hello (fw version + current button state) rather than
+        # relying on the device's connect-time one: some CH9120 batches never
+        # assert the TCP-status pin that triggers it.
+        self.sock.sendall(b'{"cmd":"hello"}\n')
 
         # Publishers: one Bool per button, True when pressed.
         self.btn_pubs = {
