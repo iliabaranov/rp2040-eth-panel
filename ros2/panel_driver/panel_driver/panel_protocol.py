@@ -13,6 +13,7 @@ Host -> device (formatters; every line ends with '\n'):
     {"cmd":"ring","id":1,"r":255,"g":64,"b":0,"brightness":128}
     {"cmd":"lamp","on":true}
     {"cmd":"hello"}   (request the hello line; the reply is the hello event)
+    {"cmd":"ping"}    (keepalive; the reply is an ack)
 
 Unit-testable standalone: test/test_panel_protocol.py imports this module with
 no ROS graph or environment.
@@ -96,6 +97,17 @@ def fmt_ring_cmd(ring_id: int, r: int, g: int, b: int, brightness: int) -> str:
 def fmt_lamp_cmd(on: bool) -> str:
     """Format a host->device lamp command line (trailing '\n' included)."""
     return '{"cmd":"lamp","on":%s}\n' % ("true" if on else "false")
+
+
+def fmt_ping_cmd() -> str:
+    """Format a host->device ping line (trailing '\n' included).
+
+    Used as the driver's keepalive: the device answers with an ack, and that
+    received traffic is what proves the connection is still alive. The CH9120
+    drops a displaced client silently (no FIN/RST), so only received bytes —
+    never successful sends — count as liveness.
+    """
+    return '{"cmd":"ping"}\n'
 
 
 def fmt_hello_cmd() -> str:

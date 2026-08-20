@@ -26,10 +26,21 @@ is a fallback, not sent immediately, because on TCPS-working units the device
 flushes its RX buffer at the connect edge and a request already in flight gets
 truncated to a junk line (the device then errs "no cmd").
 
+Liveness: the CH9120 serves ONE client and silently drops a displaced one (no
+FIN/RST), leaving a half-open socket that recv()-timeouts forever while sends
+vanish into the local TCP buffer. The driver therefore pings whenever the link
+has been quiet and declares the connection dead if NOTHING IS RECEIVED for
+liveness_timeout — received traffic is the only liveness evidence; successful
+sends prove nothing. On a dead connection it reconnects and the hello resync
+replays desired state, so recovery needs no manual restart.
+
 Parameters:
   host (str, '')          device IP (DHCP-assigned). REQUIRED.
   port (int, 5005)        device TCP port
   reconnect_period (s)    delay between reconnect attempts
+  keepalive_period (s)    ping the device after this much RX silence (2.0)
+  liveness_timeout (s)    declare the connection dead after this much RX
+                          silence and reconnect (6.0)
 """
 import socket
 import threading
@@ -42,8 +53,8 @@ from rclpy.qos import (DurabilityPolicy, QoSProfile, ReliabilityPolicy)
 from std_msgs.msg import Bool, ColorRGBA
 
 from panel_driver.panel_protocol import (
-    color_rgba_to_bytes, fmt_hello_cmd, fmt_lamp_cmd, fmt_ring_cmd,
-    parse_event,
+    color_rgba_to_bytes, fmt_hello_cmd, fmt_lamp_cmd, fmt_ping_cmd,
+    fmt_ring_cmd, parse_event,
 )
 
 RING_IDS = (1, 2)
@@ -55,10 +66,20 @@ class PanelDriver(Node):
         self.declare_parameter("host", "")
         self.declare_parameter("port", 5005)
         self.declare_parameter("reconnect_period", 2.0)
+        self.declare_parameter("keepalive_period", 2.0)
+        self.declare_parameter("liveness_timeout", 6.0)
 
         self.host = str(self.get_parameter("host").value or "")
         self.port = int(self.get_parameter("port").value)
         self.reconnect_period = float(self.get_parameter("reconnect_period").value)
+        self.keepalive_period = float(self.get_parameter("keepalive_period").value)
+        self.liveness_timeout = float(self.get_parameter("liveness_timeout").value)
+        if self.liveness_timeout < 2 * self.keepalive_period:
+            self.get_logger().warn(
+                f"liveness_timeout ({self.liveness_timeout:g}s) < 2x "
+                f"keepalive_period ({self.keepalive_period:g}s) — a single "
+                "lost ping will force a reconnect; consider widening it"
+            )
 
         if not self.host:
             self.get_logger().fatal(
@@ -118,7 +139,7 @@ class PanelDriver(Node):
                                                   timeout=5) as s:
                         self.get_logger().info(
                             f"connected to {self.host}:{self.port}")
-                        s.settimeout(1.0)
+                        s.settimeout(0.5)
                         with self._sock_lock:
                             self._sock = s
                         # Hello fallback: TCPS-dead CH9120 batches never send
@@ -129,6 +150,11 @@ class PanelDriver(Node):
                         self._hello_seen = False
                         hello_requested = False
                         t_conn = time.monotonic()
+                        # Liveness feeds on RECEIVED lines only: a displaced
+                        # client keeps send()ing into its half-open socket
+                        # successfully for minutes, so sends prove nothing.
+                        last_rx = t_conn
+                        last_ping = 0.0
                         buf = b""
                         while not self._stop.is_set():
                             try:
@@ -136,6 +162,7 @@ class PanelDriver(Node):
                                 if not data:
                                     raise ConnectionError(
                                         "peer closed connection")
+                                last_rx = time.monotonic()
                                 buf += data
                                 while b"\n" in buf:
                                     line, buf = buf.split(b"\n", 1)
@@ -143,8 +170,19 @@ class PanelDriver(Node):
                                         line.decode("utf-8", "replace"))
                             except socket.timeout:
                                 pass
+                            now = time.monotonic()
+                            if now - last_rx >= self.liveness_timeout:
+                                raise ConnectionError(
+                                    f"nothing received for "
+                                    f"{self.liveness_timeout:g}s — connection "
+                                    "dead or displaced by another client")
+                            if (now - last_rx >= self.keepalive_period
+                                    and now - last_ping
+                                        >= self.keepalive_period):
+                                last_ping = now
+                                self._send(fmt_ping_cmd())
                             if (not self._hello_seen and not hello_requested
-                                    and time.monotonic() - t_conn >= 1.0):
+                                    and now - t_conn >= 1.0):
                                 hello_requested = True
                                 self._send(fmt_hello_cmd())
                 finally:

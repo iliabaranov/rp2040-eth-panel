@@ -135,7 +135,15 @@ The driver owns desired state: it caches the last commanded ring colors and lamp
 and **re-sends them whenever the device reconnects** (every `hello` triggers this;
 the driver waits ~1 s for the device's connect-time hello and requests one itself
 if it doesn't arrive — it never fires on CH9120 batches whose TCPS status pin is
-dead). The firmware deliberately persists
+dead).
+
+The driver also supervises the link itself: the CH9120 silently drops a displaced
+client (no FIN/RST), which strands a naive client on a half-open socket. The driver
+pings after 2 s of RX silence and declares the connection dead after 6 s without
+**receiving** anything (`keepalive_period` / `liveness_timeout` parameters), then
+reconnects and resyncs automatically — no manual restarts. Note this supervises but
+does not repeal the single-client rule: two drivers pointed at one panel will
+endlessly steal the slot from each other, visibly, in both logs. The firmware deliberately persists
 nothing — see [`docs/DESIGN.md`](docs/DESIGN.md). Single TCP client only: stop
 `panel_live.py` (and any other driver) before launching the driver.
 

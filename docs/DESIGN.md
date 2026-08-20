@@ -185,6 +185,10 @@ harmless double resync.
   one uniform color.
 - `lamp`: button 1's illumination, on/off.
 - `config`: `debounce_ms` 1–1000, applies immediately (not persisted).
+- `ping`: liveness keepalive. The CH9120 drops a displaced client silently (no
+  FIN/RST), so hosts must treat **received** traffic as the only liveness evidence
+  and reconnect after an RX-silence timeout — the ROS driver pings after 2 s of
+  silence and tears down after 6 s.
 - `hello`: request the hello line; the reply is the hello event itself, not an ack.
 - `ota`: ack, then reboot into bootloader recovery ([`OTA.md`](OTA.md)).
 - Unknown/invalid commands → `{"t":"err",...}`; valid → `{"t":"ack",...}`.

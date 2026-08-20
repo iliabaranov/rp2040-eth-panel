@@ -9,8 +9,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from panel_driver.panel_protocol import (  # noqa: E402
-    color_rgba_to_bytes, fmt_hello_cmd, fmt_lamp_cmd, fmt_ring_cmd,
-    parse_event,
+    color_rgba_to_bytes, fmt_hello_cmd, fmt_lamp_cmd, fmt_ping_cmd,
+    fmt_ring_cmd, parse_event,
 )
 
 
@@ -105,10 +105,14 @@ def test_fmt_lamp_cmd():
     assert fmt_lamp_cmd(False) == '{"cmd":"lamp","on":false}\n'
 
 
-# ---- fmt_hello_cmd ----
+# ---- fmt_hello_cmd / fmt_ping_cmd ----
 
 def test_fmt_hello_cmd():
     assert fmt_hello_cmd() == '{"cmd":"hello"}\n'
+
+
+def test_fmt_ping_cmd():
+    assert fmt_ping_cmd() == '{"cmd":"ping"}\n'
 
 
 # ---- color_rgba_to_bytes ----
