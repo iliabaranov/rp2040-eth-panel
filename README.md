@@ -24,9 +24,10 @@ See [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/OTA.md`](docs/OTA.md),
 
 ## Repository layout
 ```
-bootloader/   immutable first-stage bootloader (boot select + OTA recovery receiver)
-src/          application: net (CH9120), buttons, rings, status LED, protocol, ota
-linker/       app (0x10040000) and bootloader (0x10000000, 256 KB) memory maps
+firmware/     the Pico SDK build (CMake root); COLCON_IGNORE keeps colcon out of it
+  src/          application: net (CH9120), buttons, rings, status LED, protocol, ota
+  bootloader/   immutable first-stage bootloader (boot select + OTA recovery receiver)
+  linker/       app (0x10040000) and bootloader (0x10000000, 256 KB) memory maps
 ros2/panel_driver/   ROS 2 (Humble) driver: button topics in, ring/lamp topics out
 examples/     standalone single-file ROS 2 driver (run directly — no colcon build)
 test/         pytest + ctypes tests for the pure logic (buttons/rings/protocol) + OTA sim
@@ -46,7 +47,7 @@ export PATH=~/pico/xpack-arm-none-eabi-gcc-13.2.1-1.1/bin:~/.local/bin:$PATH   #
 
 ## Build
 ```bash
-cmake -S . -B build          # one-time configure
+cmake -S firmware -B build   # one-time configure
 cmake --build build -j       # -> build/{bootloader,panel,apptest}.uf2 (+ .bin)
 ```
 
@@ -62,11 +63,11 @@ last octet (green = DHCP).
 
 ## Bench test (no network): RING_SELFTEST
 ```bash
-cmake -B build -DRING_SELFTEST=1 && cmake --build build -j && tools/flash.sh --no-build
+cmake -S firmware -B build -DRING_SELFTEST=1 && cmake --build build -j && tools/flash.sh --no-build
 ```
 Skips networking and cycles pure logical **RED 1 s → GREEN 2 s → BLUE 4 s** on both
 rings — the distinct dwell times identify which channel is which, so a GRB/RGB swap is
-obvious (fix via `RING_COLOR_ORDER_GRB` in `src/config.h`). Raw button edges echo on
+obvious (fix via `RING_COLOR_ORDER_GRB` in `firmware/src/config.h`). Raw button edges echo on
 USB serial and the lamp follows button 1, so the whole panel is verifiable with just
 USB power. Rebuild without the flag for the normal firmware.
 
@@ -111,7 +112,7 @@ auto-retries on a fresh connection if the link blips (`--retries`, default 3). S
 > The color reflects the **configured IP mode**, not a live Ethernet link. The CH9120
 > exposes no link/DHCP status to the RP2040 (its `LINK` pin drives the RJ45 jack LEDs,
 > not a GPIO), and returns a cached IP even with no cable — so firmware can't detect
-> "cable attached." Set the mode for your network via `NET_USE_DHCP` in `src/config.h`
+> "cable attached." Set the mode for your network via `NET_USE_DHCP` in `firmware/src/config.h`
 > (no auto-fallback).
 
 ## ROS 2 driver (Humble)

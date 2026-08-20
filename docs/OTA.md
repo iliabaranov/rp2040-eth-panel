@@ -25,7 +25,7 @@ talks Ethernet and still accepts a fresh image.
 | Boot-state B | 0x103FF000 | 0x3FF000 | 4 KB | redundant, CRC'd |
 
 App images are ~100–200 KB, so the slot is far larger than needed (room to grow).
-Definitions shared by bootloader and app live in `src/ota/layout.h`.
+Definitions shared by bootloader and app live in `firmware/src/ota/layout.h`.
 
 ## Images & jump
 - Both bootloader and app are normal Pico-SDK binaries (each has its own boot2). The

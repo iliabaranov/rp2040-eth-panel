@@ -5,7 +5,7 @@
 # Unlike the keypad project's Makefile, the library also depends on the module
 # HEADERS, so a header-only edit (struct layout, enum order) rebuilds the .so
 # instead of leaving pytest running against stale code.
-SRC := ../../src
+SRC := ../../firmware/src
 CFLAGS := -std=c11 -O2 -fPIC -Wall -Wextra -I$(SRC)
 
 SRCS := \

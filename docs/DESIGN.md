@@ -84,7 +84,7 @@ The RP2040 holds CFG low, sends config frames (`0x57 0xAB <cmd> <data>`) at 9600
 set mode/IP/subnet/gateway/port and the data baud, commits (`0x0d` save, `0x0e`
 execute+reset), releases CFG, and switches UART1 to 115200. Thereafter UART1 is a transparent pipe to
 the TCP socket — the protocol layer just reads/writes bytes. `net_peer_connected()`
-reflects the TCPS pin. See `src/net/net.c`.
+reflects the TCPS pin. See `firmware/src/net/net.c`.
 
 ## Software architecture
 
@@ -92,7 +92,7 @@ Clean separation: **pure logic** modules (no hardware, no SDK calls — host-tes
 behind thin **glue** that touches the SDK/GPIO/PIO/CH9120.
 
 ```
-src/
+firmware/src/
   main.c                — super-loop: buttons -> events, dispatch commands, flush rings
   config.h              — compile-time defaults (pins, ring sizes, debounce, IP mode)
   buttons/
@@ -110,7 +110,7 @@ src/
     protocol.h/.c       — PURE: JSON parse (commands) / format (events), schema
   status_led/           — onboard WS2812 (PIO): boot/mode/recovery indication
   ota/                  — flash layout, CRC32, boot-state, app-side update trigger
-bootloader/             — immutable first stage: boot select + network OTA recovery
+firmware/bootloader/    — immutable first stage: boot select + network OTA recovery
 test/                   — pytest + ctypes against a host-built shared lib of the PURE
                           modules; OTA failure-injection suite (sim + real flasher)
 ```
@@ -222,7 +222,7 @@ LED.
 
 To verify a new ring batch:
 ```bash
-cmake -B build -DRING_SELFTEST=1 && cmake --build build -j
+cmake -S firmware -B build -DRING_SELFTEST=1 && cmake --build build -j
 ```
 The self-test build skips networking and cycles pure logical **RED 1 s / GREEN 2 s /
 BLUE 4 s** on both rings — watch the **dwell time** to identify which channel is
@@ -231,7 +231,7 @@ echoes raw button edges on USB serial and drives the lamp from button 1, so the 
 panel is bench-testable with no network.
 
 ## Configuration
-Compile-time defaults in `src/config.h`: pins, ring LED counts (`RING1_NUM_LEDS` /
+Compile-time defaults in `firmware/src/config.h`: pins, ring LED counts (`RING1_NUM_LEDS` /
 `RING2_NUM_LEDS`, both 16), color order, debounce 30 ms, IP mode `NET_USE_DHCP` +
 static IP/mask/gw for the static option, TCP port 5005. The only runtime override is
 `debounce_ms` via the `config` command (intentionally not persisted — see above).
