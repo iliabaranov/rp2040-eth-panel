@@ -9,7 +9,7 @@ if [[ "${1:-}" != "--no-build" ]]; then
 fi
 
 UF2=build/panel.uf2
-[[ -f "$UF2" ]] || { echo "missing $UF2 — configure with: cmake -S . -B build" >&2; exit 1; }
+[[ -f "$UF2" ]] || { echo "missing $UF2 — configure with: cmake -S firmware -B build" >&2; exit 1; }
 
 # Try without sudo first (works if the 99-picotool.rules udev rule is active for
 # the current connection); fall back to sudo.
